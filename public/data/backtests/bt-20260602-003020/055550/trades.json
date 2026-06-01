@@ -1,0 +1,26 @@
+[
+  {
+    "tradeDate": "2026-05-06",
+    "side": "BUY",
+    "quantity": 102,
+    "price": 97900,
+    "commissionKrw": 0,
+    "sellTaxKrw": 0,
+    "cashKrwAfterExecution": 14200,
+    "positionQuantityAfterExecution": 102,
+    "totalAssetKrwAfterExecution": 9938800,
+    "note": "전일 BUY 신호를 다음 영업일 시가에 체결"
+  },
+  {
+    "tradeDate": "2026-05-26",
+    "side": "SELL",
+    "quantity": 102,
+    "price": 98200,
+    "commissionKrw": 0,
+    "sellTaxKrw": 0,
+    "cashKrwAfterExecution": 10030600,
+    "positionQuantityAfterExecution": 0,
+    "totalAssetKrwAfterExecution": 10030600,
+    "note": "전일 SELL 신호를 다음 영업일 시가에 전량 체결"
+  }
+]

@@ -2,41 +2,14 @@
 
 import * as React from "react"
 import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type UniqueIdentifier,
-} from "@dnd-kit/core"
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import {
   flexRender,
   getCoreRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
-  getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
-  type ColumnFiltersState,
-  type Row,
   type SortingState,
-  type VisibilityState,
 } from "@tanstack/react-table"
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
-import { z } from "zod"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
@@ -47,7 +20,6 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Drawer,
   DrawerClose,
@@ -58,23 +30,6 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer"
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import {
   Table,
@@ -91,592 +46,424 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import {
-  GripVerticalIcon,
-  CircleCheckIcon,
-  LoaderIcon,
-  EllipsisVerticalIcon,
-  Columns3Icon,
+  ChevronUpIcon,
   ChevronDownIcon,
-  ChevronsLeftIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronsRightIcon,
   TrendingUpIcon,
   TrendingDownIcon,
+  MinusIcon,
 } from "lucide-react"
 
-export const schema = z.object({
-  id: z.number(),
-  run_at: z.string(),
-  symbol: z.string(),
-  signal: z.string(),
-  now_price: z.number(),
-  z_score: z.number(),
-  rolling_mean: z.number(),
-  rolling_stddev: z.number(),
-  close_prices: z.array(z.number()),
-  order_executed: z.boolean(),
-  order_skip_reason: z.string().nullable(),
-})
-
-function formatKRW(price: number): string {
-  return `₩${price.toLocaleString("ko-KR")}`
+export type Run = {
+  symbol: string
+  companyName: string
+  sector: string
+  initialBudgetKrw: number
+  finalAssetKrw: number
+  profitKrw: number
+  returnRatePercent: number
+  tradeCount: number
+  buyCount: number
+  sellCount: number
+  finalPositionQuantity: number
+  maxDrawdownPercent: number
 }
 
-function DragHandle({ id }: { id: number }) {
-  const { attributes, listeners } = useSortable({ id })
+export type Trade = {
+  tradeDate: string
+  side: string
+  quantity: number
+  price: number
+  commissionKrw: number
+  sellTaxKrw: number
+  cashKrwAfterExecution: number
+  totalAssetKrwAfterExecution: number
+  note: string
+  symbol: string
+  companyName: string
+}
 
+function formatKRW(value: number) {
+  return `₩${Math.abs(value).toLocaleString("ko-KR")}`
+}
+
+function ReturnBadge({ value }: { value: number }) {
+  if (value > 0)
+    return (
+      <span className="font-semibold tabular-nums text-green-600">
+        +{value.toFixed(2)}%
+      </span>
+    )
+  if (value < 0)
+    return (
+      <span className="font-semibold tabular-nums text-red-600">
+        {value.toFixed(2)}%
+      </span>
+    )
   return (
-    <Button
-      {...attributes}
-      {...listeners}
-      variant="ghost"
-      size="icon"
-      className="size-7 text-muted-foreground hover:bg-transparent"
-    >
-      <GripVerticalIcon className="size-3 text-muted-foreground" />
-      <span className="sr-only">Drag to reorder</span>
-    </Button>
+    <span className="font-semibold tabular-nums text-muted-foreground">
+      0.00%
+    </span>
   )
 }
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
+function SortHeader({
+  label,
+  column,
+}: {
+  label: string
+  column: { getIsSorted: () => false | "asc" | "desc"; toggleSorting: (desc?: boolean) => void }
+}) {
+  const sorted = column.getIsSorted()
+  return (
+    <button
+      className="flex items-center gap-1 hover:text-foreground transition-colors"
+      onClick={() => column.toggleSorting(sorted === "asc")}
+    >
+      {label}
+      {sorted === "asc" ? (
+        <ChevronUpIcon className="size-3" />
+      ) : sorted === "desc" ? (
+        <ChevronDownIcon className="size-3" />
+      ) : (
+        <span className="size-3 opacity-30">↕</span>
+      )}
+    </button>
+  )
+}
+
+const runColumns: ColumnDef<Run>[] = [
   {
-    id: "drag",
-    header: () => null,
-    cell: ({ row }) => <DragHandle id={row.original.id} />,
-  },
-  {
-    id: "select",
-    header: ({ table }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && "indeterminate")
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
-      </div>
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "symbol",
+    accessorKey: "companyName",
     header: "종목",
-    cell: ({ row }) => <TableCellViewer item={row.original} />,
+    cell: ({ row }) => <RunCellViewer run={row.original} />,
     enableHiding: false,
   },
   {
-    accessorKey: "signal",
-    header: "신호",
-    cell: ({ row }) => {
-      const signal = row.original.signal
-      const colorClass =
-        signal === "BUY"
-          ? "text-green-600 border-green-200 dark:border-green-800"
-          : signal === "SELL"
-            ? "text-red-600 border-red-200 dark:border-red-800"
-            : "text-muted-foreground"
-      return (
-        <Badge variant="outline" className={`px-1.5 font-semibold ${colorClass}`}>
-          {signal}
-        </Badge>
-      )
-    },
-  },
-  {
-    accessorKey: "now_price",
-    header: () => <div className="w-full text-right">현재가</div>,
+    accessorKey: "sector",
+    header: "섹터",
     cell: ({ row }) => (
-      <div className="text-right tabular-nums">
-        {formatKRW(row.original.now_price)}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "z_score",
-    header: () => <div className="w-full text-right">Z-Score</div>,
-    cell: ({ row }) => (
-      <div className="text-right tabular-nums">
-        {row.original.z_score.toFixed(2)}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "rolling_mean",
-    header: () => <div className="w-full text-right">이동평균</div>,
-    cell: ({ row }) => (
-      <div className="text-right tabular-nums">
-        {formatKRW(Math.round(row.original.rolling_mean))}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "order_executed",
-    header: "주문",
-    cell: ({ row }) => (
-      <Badge
-        variant="outline"
-        className={`px-1.5 ${row.original.order_executed ? "text-green-600 border-green-200 dark:border-green-800" : "text-muted-foreground"}`}
-      >
-        {row.original.order_executed ? (
-          <CircleCheckIcon className="fill-green-500 dark:fill-green-400" />
-        ) : (
-          <LoaderIcon />
-        )}
-        {row.original.order_executed ? "체결" : "미체결"}
+      <Badge variant="outline" className="text-xs">
+        {row.original.sector}
       </Badge>
     ),
   },
   {
-    id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="flex size-8 text-muted-foreground data-[state=open]:bg-muted"
-            size="icon"
-          >
-            <EllipsisVerticalIcon />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>상세 보기</DropdownMenuItem>
-          <DropdownMenuItem>복사</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">삭제</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+    accessorKey: "returnRatePercent",
+    header: ({ column }) => (
+      <div className="text-right">
+        <SortHeader label="수익률" column={column} />
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div className="text-right">
+        <ReturnBadge value={row.original.returnRatePercent} />
+      </div>
+    ),
+  },
+  {
+    accessorKey: "profitKrw",
+    header: () => <div className="text-right">수익금</div>,
+    cell: ({ row }) => {
+      const v = row.original.profitKrw
+      return (
+        <div
+          className={`text-right tabular-nums ${v > 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-muted-foreground"}`}
+        >
+          {v >= 0 ? "+" : "-"}{formatKRW(v)}
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: "finalAssetKrw",
+    header: () => <div className="text-right">최종 자산</div>,
+    cell: ({ row }) => (
+      <div className="text-right tabular-nums">{formatKRW(row.original.finalAssetKrw)}</div>
+    ),
+  },
+  {
+    accessorKey: "tradeCount",
+    header: () => <div className="text-right">거래수</div>,
+    cell: ({ row }) => (
+      <div className="text-right tabular-nums">{row.original.tradeCount}건</div>
+    ),
+  },
+  {
+    accessorKey: "finalPositionQuantity",
+    header: "보유",
+    cell: ({ row }) => {
+      const qty = row.original.finalPositionQuantity
+      return qty > 0 ? (
+        <Badge variant="outline" className="text-xs text-blue-600 border-blue-200 dark:border-blue-800">
+          {qty}주
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="text-xs text-muted-foreground">
+          없음
+        </Badge>
+      )
+    },
+  },
+]
+
+const tradeColumns: ColumnDef<Trade>[] = [
+  {
+    accessorKey: "tradeDate",
+    header: "날짜",
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {new Date(row.original.tradeDate).toLocaleDateString("ko-KR", {
+          month: "2-digit",
+          day: "2-digit",
+        })}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "companyName",
+    header: "종목",
+    cell: ({ row }) => (
+      <div>
+        <div className="font-medium">{row.original.companyName}</div>
+        <div className="text-xs text-muted-foreground">{row.original.symbol}</div>
+      </div>
+    ),
+    enableHiding: false,
+  },
+  {
+    accessorKey: "side",
+    header: "구분",
+    cell: ({ row }) => (
+      <Badge
+        variant="outline"
+        className={`font-semibold ${row.original.side === "BUY" ? "text-green-600 border-green-200 dark:border-green-800" : "text-red-600 border-red-200 dark:border-red-800"}`}
+      >
+        {row.original.side === "BUY" ? (
+          <TrendingUpIcon className="size-3" />
+        ) : (
+          <TrendingDownIcon className="size-3" />
+        )}
+        {row.original.side}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: "quantity",
+    header: () => <div className="text-right">수량</div>,
+    cell: ({ row }) => (
+      <div className="text-right tabular-nums">
+        {row.original.quantity.toLocaleString("ko-KR")}주
+      </div>
+    ),
+  },
+  {
+    accessorKey: "price",
+    header: () => <div className="text-right">체결가</div>,
+    cell: ({ row }) => (
+      <div className="text-right tabular-nums">{formatKRW(row.original.price)}</div>
+    ),
+  },
+  {
+    id: "amount",
+    header: () => <div className="text-right">체결금액</div>,
+    cell: ({ row }) => (
+      <div className="text-right tabular-nums">
+        {formatKRW(row.original.price * row.original.quantity)}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "totalAssetKrwAfterExecution",
+    header: () => <div className="text-right">체결 후 자산</div>,
+    cell: ({ row }) => (
+      <div className="text-right tabular-nums">
+        {formatKRW(row.original.totalAssetKrwAfterExecution)}
+      </div>
     ),
   },
 ]
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
-  const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.original.id,
+function RunTable({ runs }: { runs: Run[] }) {
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "returnRatePercent", desc: true },
+  ])
+
+  const table = useReactTable({
+    data: runs,
+    columns: runColumns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
   })
 
   return (
-    <TableRow
-      data-state={row.getIsSelected() && "selected"}
-      data-dragging={isDragging}
-      ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition,
-      }}
-    >
-      {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
-    </TableRow>
+    <div className="overflow-hidden rounded-lg border">
+      <Table>
+        <TableHeader className="sticky top-0 z-10 bg-muted">
+          {table.getHeaderGroups().map((hg) => (
+            <TableRow key={hg.id}>
+              {hg.headers.map((h) => (
+                <TableHead key={h.id} colSpan={h.colSpan}>
+                  {h.isPlaceholder
+                    ? null
+                    : flexRender(h.column.columnDef.header, h.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   )
 }
 
-export function DataTable({
-  data: initialData,
-}: {
-  data: z.infer<typeof schema>[]
-}) {
-  const [data, setData] = React.useState(() => initialData)
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
-  const [sorting, setSorting] = React.useState<SortingState>([])
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 10,
-  })
-  const sortableId = React.useId()
-  const sensors = useSensors(
-    useSensor(MouseSensor, {}),
-    useSensor(TouchSensor, {}),
-    useSensor(KeyboardSensor, {})
-  )
-
-  const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
-    [data]
-  )
+function TradeTable({ trades }: { trades: Trade[] }) {
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "tradeDate", desc: false },
+  ])
 
   const table = useReactTable({
-    data,
-    columns,
-    state: {
-      sorting,
-      columnVisibility,
-      rowSelection,
-      columnFilters,
-      pagination,
-    },
-    getRowId: (row) => row.id.toString(),
-    enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
+    data: trades,
+    columns: tradeColumns,
+    state: { sorting },
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
-    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
   })
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (active && over && active.id !== over.id) {
-      setData((data) => {
-        const oldIndex = dataIds.indexOf(active.id)
-        const newIndex = dataIds.indexOf(over.id)
-        return arrayMove(data, oldIndex, newIndex)
-      })
-    }
-  }
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <Table>
+        <TableHeader className="sticky top-0 z-10 bg-muted">
+          {table.getHeaderGroups().map((hg) => (
+            <TableRow key={hg.id}>
+              {hg.headers.map((h) => (
+                <TableHead key={h.id} colSpan={h.colSpan}>
+                  {h.isPlaceholder
+                    ? null
+                    : flexRender(h.column.columnDef.header, h.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
+export function DataTable({ runs, trades }: { runs: Run[]; trades: Trade[] }) {
+  const buyCount = trades.filter((t) => t.side === "BUY").length
+  const sellCount = trades.filter((t) => t.side === "SELL").length
 
   return (
-    <Tabs
-      defaultValue="all"
-      className="w-full flex-col justify-start gap-6"
-    >
+    <Tabs defaultValue="performance" className="w-full flex-col justify-start gap-6">
       <div className="flex items-center justify-between px-4 lg:px-6">
-        <Label htmlFor="view-selector" className="sr-only">
-          View
-        </Label>
-        <Select defaultValue="all">
-          <SelectTrigger
-            className="flex w-fit @4xl/main:hidden"
-            size="sm"
-            id="view-selector"
-          >
-            <SelectValue placeholder="보기 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="all">전체 로그</SelectItem>
-              <SelectItem value="buy">BUY 신호</SelectItem>
-              <SelectItem value="executed">체결 내역</SelectItem>
-              <SelectItem value="analysis">수익 분석</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <TabsList className="hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="all">전체 로그</TabsTrigger>
-          <TabsTrigger value="buy">
-            BUY 신호 <Badge variant="secondary">4</Badge>
+        <TabsList>
+          <TabsTrigger value="performance">
+            종목별 성과
+            <Badge variant="secondary" className="ml-1 size-5 rounded-full px-0 text-center text-[10px]">
+              {runs.length}
+            </Badge>
           </TabsTrigger>
-          <TabsTrigger value="executed">
-            체결 내역 <Badge variant="secondary">3</Badge>
+          <TabsTrigger value="trades">
+            거래 내역
+            <Badge variant="secondary" className="ml-1 size-5 rounded-full px-0 text-center text-[10px]">
+              {trades.length}
+            </Badge>
           </TabsTrigger>
-          <TabsTrigger value="analysis">수익 분석</TabsTrigger>
         </TabsList>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Columns3Icon data-icon="inline-start" />
-                컬럼
-                <ChevronDownIcon data-icon="inline-end" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
-              {table
-                .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="hidden text-xs text-muted-foreground @4xl/main:flex gap-3">
+          <span className="flex items-center gap-1">
+            <span className="inline-block size-2 rounded-full bg-green-500" />
+            매수 {buyCount}건
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block size-2 rounded-full bg-red-500" />
+            매도 {sellCount}건
+          </span>
         </div>
       </div>
-      <TabsContent
-        value="all"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
-      >
-        <div className="overflow-hidden rounded-lg border">
-          <DndContext
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-            sensors={sensors}
-            id={sortableId}
-          >
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id} colSpan={header.colSpan}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      )
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                {table.getRowModel().rows?.length ? (
-                  <SortableContext
-                    items={dataIds}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {table.getRowModel().rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} />
-                    ))}
-                  </SortableContext>
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      결과 없음.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </DndContext>
-        </div>
-        <div className="flex items-center justify-between px-4">
-          <div className="hidden flex-1 text-sm text-muted-foreground lg:flex">
-            {table.getFilteredSelectedRowModel().rows.length} /{" "}
-            {table.getFilteredRowModel().rows.length}개 선택됨
-          </div>
-          <div className="flex w-full items-center gap-8 lg:w-fit">
-            <div className="hidden items-center gap-2 lg:flex">
-              <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                페이지당 행
-              </Label>
-              <Select
-                value={`${table.getState().pagination.pageSize}`}
-                onValueChange={(value) => {
-                  table.setPageSize(Number(value))
-                }}
-              >
-                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                  <SelectValue
-                    placeholder={table.getState().pagination.pageSize}
-                  />
-                </SelectTrigger>
-                <SelectContent side="top">
-                  <SelectGroup>
-                    {[10, 20, 30, 40, 50].map((pageSize) => (
-                      <SelectItem key={pageSize} value={`${pageSize}`}>
-                        {pageSize}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex w-fit items-center justify-center text-sm font-medium">
-              {table.getState().pagination.pageIndex + 1} /{" "}
-              {table.getPageCount()} 페이지
-            </div>
-            <div className="ml-auto flex items-center gap-2 lg:ml-0">
-              <Button
-                variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">첫 페이지</span>
-                <ChevronsLeftIcon />
-              </Button>
-              <Button
-                variant="outline"
-                className="size-8"
-                size="icon"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">이전 페이지</span>
-                <ChevronLeftIcon />
-              </Button>
-              <Button
-                variant="outline"
-                className="size-8"
-                size="icon"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">다음 페이지</span>
-                <ChevronRightIcon />
-              </Button>
-              <Button
-                variant="outline"
-                className="hidden size-8 lg:flex"
-                size="icon"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">마지막 페이지</span>
-                <ChevronsRightIcon />
-              </Button>
-            </div>
-          </div>
-        </div>
+
+      <TabsContent value="performance" className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
+        <RunTable runs={runs} />
       </TabsContent>
-      <TabsContent value="buy" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="executed" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="analysis" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
+
+      <TabsContent value="trades" className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
+        <TradeTable trades={trades} />
       </TabsContent>
     </Tabs>
   )
 }
 
 const drawerChartConfig = {
-  price: {
-    label: "종가",
+  totalAssetKrw: {
+    label: "총 자산",
     color: "var(--primary)",
-  },
-  mean: {
-    label: "이동평균",
-    color: "var(--chart-2)",
   },
 } satisfies ChartConfig
 
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
+function RunCellViewer({ run }: { run: Run }) {
   const isMobile = useIsMobile()
 
-  const closeChartData = item.close_prices.map((price, i) => ({
-    day: `D-${item.close_prices.length - 1 - i}`,
-    price,
-    mean: Math.round(item.rolling_mean),
-  }))
-
-  const runAt = new Date(item.run_at).toLocaleString("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-
-  const aboveZ = Math.abs(item.z_score) > 1.5
+  const assetChartData = [
+    { label: "초기", totalAssetKrw: run.initialBudgetKrw },
+    { label: "최종", totalAssetKrw: run.finalAssetKrw },
+  ]
 
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild>
         <Button variant="link" className="w-fit px-0 text-left text-foreground">
-          <span className="font-medium">{item.symbol}</span>
-          <span className="ml-2 text-xs text-muted-foreground">{runAt}</span>
+          <span className="font-medium">{run.companyName}</span>
+          <span className="ml-2 text-xs text-muted-foreground">{run.symbol}</span>
         </Button>
       </DrawerTrigger>
       <DrawerContent>
         <DrawerHeader className="gap-1">
-          <DrawerTitle>{item.symbol} 매매 로그</DrawerTitle>
-          <DrawerDescription>{runAt}</DrawerDescription>
+          <DrawerTitle>
+            {run.companyName} ({run.symbol}) — 백테스트 결과
+          </DrawerTitle>
+          <DrawerDescription>{run.sector} · 2026년 5월</DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
           {!isMobile && (
             <>
-              <ChartContainer config={drawerChartConfig}>
-                <AreaChart
-                  accessibilityLayer
-                  data={closeChartData}
-                  margin={{ left: 0, right: 10 }}
-                >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="day"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value) =>
-                          `₩${Number(value).toLocaleString("ko-KR")}`
-                        }
-                        indicator="dot"
-                      />
-                    }
-                  />
-                  <Area
-                    dataKey="mean"
-                    type="natural"
-                    fill="var(--color-mean)"
-                    fillOpacity={0.2}
-                    stroke="var(--color-mean)"
-                    strokeDasharray="4 4"
-                  />
-                  <Area
-                    dataKey="price"
-                    type="natural"
-                    fill="var(--color-price)"
-                    fillOpacity={0.4}
-                    stroke="var(--color-price)"
-                  />
-                </AreaChart>
-              </ChartContainer>
-              <Separator />
-              <div className="grid gap-2">
-                <div className="flex gap-2 leading-none font-medium">
-                  Z-Score {item.z_score.toFixed(2)}{" "}
-                  {aboveZ ? "— 임계치 근접" : "— 정상 범위"}
-                  {item.z_score > 0 ? (
-                    <TrendingUpIcon className="size-4" />
-                  ) : (
-                    <TrendingDownIcon className="size-4" />
-                  )}
+              <div className="grid grid-cols-2 gap-3 rounded-lg border p-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs text-muted-foreground">수익률</span>
+                  <span className={`text-lg font-bold tabular-nums ${run.returnRatePercent > 0 ? "text-green-600" : run.returnRatePercent < 0 ? "text-red-600" : ""}`}>
+                    {run.returnRatePercent >= 0 ? "+" : ""}{run.returnRatePercent.toFixed(3)}%
+                  </span>
                 </div>
-                <div className="text-muted-foreground">
-                  이동평균 {formatKRW(Math.round(item.rolling_mean))} 기준 ·
-                  표준편차{" "}
-                  {item.rolling_stddev.toLocaleString("ko-KR", {
-                    maximumFractionDigits: 2,
-                  })}
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs text-muted-foreground">수익금</span>
+                  <span className={`text-lg font-bold tabular-nums ${run.profitKrw > 0 ? "text-green-600" : run.profitKrw < 0 ? "text-red-600" : ""}`}>
+                    {run.profitKrw >= 0 ? "+" : "-"}₩{Math.abs(run.profitKrw).toLocaleString("ko-KR")}
+                  </span>
                 </div>
               </div>
               <Separator />
@@ -684,46 +471,60 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
           )}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">신호</span>
-              <span
-                className={`font-semibold ${item.signal === "BUY" ? "text-green-600" : item.signal === "SELL" ? "text-red-600" : ""}`}
-              >
-                {item.signal}
+              <span className="text-xs text-muted-foreground">초기 자금</span>
+              <span className="font-medium tabular-nums">₩{run.initialBudgetKrw.toLocaleString("ko-KR")}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">최종 자산</span>
+              <span className="font-medium tabular-nums">₩{run.finalAssetKrw.toLocaleString("ko-KR")}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">총 거래수</span>
+              <span className="font-medium">{run.tradeCount}건</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">매수 / 매도</span>
+              <span className="font-medium">{run.buyCount}건 / {run.sellCount}건</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">최대 낙폭 (MDD)</span>
+              <span className={`font-medium tabular-nums ${run.maxDrawdownPercent < 0 ? "text-red-600" : ""}`}>
+                {run.maxDrawdownPercent.toFixed(4)}%
               </span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">현재가</span>
-              <span className="font-medium">{formatKRW(item.now_price)}</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Z-Score</span>
-              <span className="font-medium">{item.z_score.toFixed(2)}</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">
-                이동평균 (9일)
-              </span>
+              <span className="text-xs text-muted-foreground">잔여 보유 수량</span>
               <span className="font-medium">
-                {formatKRW(Math.round(item.rolling_mean))}
+                {run.finalPositionQuantity > 0 ? `${run.finalPositionQuantity}주` : "없음"}
               </span>
             </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">주문 상태</span>
-              <span
-                className={`font-medium ${item.order_executed ? "text-green-600" : ""}`}
-              >
-                {item.order_executed ? "체결됨" : "미체결"}
-              </span>
-            </div>
-            {item.order_skip_reason && (
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">
-                  미체결 사유
-                </span>
-                <span className="font-medium">{item.order_skip_reason}</span>
-              </div>
-            )}
           </div>
+          {!isMobile && run.tradeCount > 0 && (
+            <>
+              <Separator />
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2 font-medium leading-none">
+                  {run.returnRatePercent > 0 ? (
+                    <>수익 실현 <TrendingUpIcon className="size-4 text-green-600" /></>
+                  ) : (
+                    <>손실 발생 <TrendingDownIcon className="size-4 text-red-600" /></>
+                  )}
+                </div>
+                <div className="text-muted-foreground">
+                  초기 ₩{run.initialBudgetKrw.toLocaleString("ko-KR")} → 최종 ₩{run.finalAssetKrw.toLocaleString("ko-KR")}
+                </div>
+              </div>
+            </>
+          )}
+          {!isMobile && run.tradeCount === 0 && (
+            <>
+              <Separator />
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <MinusIcon className="size-4" />
+                <span>이 종목은 매매 신호가 발생하지 않아 거래 없이 초기 자금 유지</span>
+              </div>
+            </>
+          )}
         </div>
         <DrawerFooter>
           <DrawerClose asChild>

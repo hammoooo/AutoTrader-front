@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardAction,
@@ -8,96 +8,183 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { TrendingUpIcon, TrendingDownIcon, ActivityIcon, WalletIcon } from "lucide-react"
+} from "@/components/ui/card";
+import {
+  TrendingUpIcon,
+  TrendingDownIcon,
+  BarChart3Icon,
+  MinusIcon,
+} from "lucide-react";
 
-export function SectionCards() {
+type Run = {
+  symbol: string;
+  companyName: string;
+  sector: string;
+  initialBudgetKrw: number;
+  finalAssetKrw: number;
+  profitKrw: number;
+  returnRatePercent: number;
+  tradeCount: number;
+  buyCount: number;
+  sellCount: number;
+  finalPositionQuantity: number;
+  maxDrawdownPercent: number;
+};
+
+type PortfolioSummary = {
+  symbolCount: number;
+  totalInitialBudgetKrw: number;
+  totalFinalAssetKrw: number;
+  totalProfitKrw: number;
+  totalReturnRatePercent: number;
+  averageReturnRatePercent: number;
+};
+
+type Props = {
+  portfolioSummary: PortfolioSummary;
+  runs: Run[];
+  period: { startDate: string; endDate: string };
+};
+
+function formatKRW(value: number) {
+  return `₩${Math.abs(value).toLocaleString("ko-KR")}`;
+}
+
+export function SectionCards({ portfolioSummary, runs, period }: Props) {
+  const sorted = [...runs].sort(
+    (a, b) => b.returnRatePercent - a.returnRatePercent,
+  );
+  const best = sorted[0];
+  const worst = sorted[sorted.length - 1];
+  const totalTrades = runs.reduce((sum, r) => sum + r.tradeCount, 0);
+  const isProfit = portfolioSummary.totalProfitKrw >= 0;
+
+  const periodLabel = `${period.startDate.slice(5).replace("-", "/")} ~ ${period.endDate.slice(5).replace("-", "/")}`;
+
   return (
     <div className="grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
+      {/* Card 1: Total Portfolio Profit */}
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>현재가 (005930)</CardDescription>
+          <CardDescription>포트폴리오 총 수익금</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            ₩196,500
+            {isProfit ? "+" : "-"}
+            {formatKRW(portfolioSummary.totalProfitKrw)}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <TrendingUpIcon />
-              +7.37%
+            <Badge
+              variant="outline"
+              className={
+                isProfit
+                  ? "text-green-600 border-green-200 dark:border-green-800"
+                  : "text-red-600 border-red-200 dark:border-red-800"
+              }
+            >
+              {isProfit ? <TrendingUpIcon /> : <TrendingDownIcon />}
+              {isProfit ? "+" : ""}
+              {portfolioSummary.totalReturnRatePercent.toFixed(2)}%
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            이동평균 대비 상단 <TrendingUpIcon className="size-4" />
+            원금 {formatKRW(portfolioSummary.totalInitialBudgetKrw)} 기준
           </div>
           <div className="text-muted-foreground">
-            장 마감 기준 최종 종가
+            최종 자산 {formatKRW(portfolioSummary.totalFinalAssetKrw)}
           </div>
         </CardFooter>
       </Card>
+
+      {/* Card 2: Trade Stats */}
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Z-Score</CardDescription>
+          <CardDescription>총 거래 건수</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            1.56
+            {totalTrades}건
           </CardTitle>
           <CardAction>
             <Badge variant="outline">
-              <ActivityIcon />
-              정상 범위
+              <BarChart3Icon />
+              {portfolioSummary.symbolCount}개 종목
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            상단 밴드 근접 중 <TrendingUpIcon className="size-4" />
+            Z-Score 평균회귀 전략 (Window 9)
           </div>
           <div className="text-muted-foreground">
-            |Z| &lt; 2.0 → HOLD 구간
+            백테스트 기간 {periodLabel}
           </div>
         </CardFooter>
       </Card>
+
+      {/* Card 3: Best Stock */}
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>9일 이동평균</CardDescription>
+          <CardDescription>최고 수익 종목</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            ₩183,011
+            {best.companyName}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <TrendingDownIcon />
-              -7.10%
+            <Badge
+              variant="outline"
+              className="text-green-600 border-green-200 dark:border-green-800"
+            >
+              <TrendingUpIcon />+{best.returnRatePercent.toFixed(2)}%
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            현재가 아래 위치 <TrendingDownIcon className="size-4" />
+            수익금 +{formatKRW(best.profitKrw)}{" "}
+            <TrendingUpIcon className="size-4" />
           </div>
-          <div className="text-muted-foreground">표준편차 ₩8,647</div>
+          <div className="text-muted-foreground">
+            {best.sector} - {best.tradeCount}건 거래
+            {/* {best.maxDrawdownPercent.toFixed(2)}% */}
+          </div>
         </CardFooter>
       </Card>
+
+      {/* Card 4: Worst Stock */}
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>매매 예산</CardDescription>
+          <CardDescription>최저 수익 종목</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            ₩300,000
+            {worst.companyName}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <WalletIcon />
-              1주 가능
+            <Badge
+              variant="outline"
+              className={
+                worst.returnRatePercent < 0
+                  ? "text-red-600 border-red-200 dark:border-red-800"
+                  : "text-muted-foreground"
+              }
+            >
+              {worst.returnRatePercent < 0 ? (
+                <TrendingDownIcon />
+              ) : (
+                <MinusIcon />
+              )}
+              {worst.returnRatePercent >= 0 ? "+" : ""}
+              {worst.returnRatePercent.toFixed(2)}%
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            BUY 신호 시 1주 매수
+            수익금 {worst.profitKrw >= 0 ? "+" : "-"}
+            {formatKRW(worst.profitKrw)} <TrendingDownIcon className="size-4" />
           </div>
-          <div className="text-muted-foreground">주문 수량: 1주</div>
+          <div className="text-muted-foreground">
+            {worst.sector} - {worst.tradeCount}건 거래
+            {/* {worst.maxDrawdownPercent.toFixed(2)}% */}
+          </div>
         </CardFooter>
       </Card>
     </div>
-  )
+  );
 }

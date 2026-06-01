@@ -1,0 +1,27 @@
+[
+  {
+    "symbol": "005930",
+    "companyName": "삼성전자",
+    "sector": "반도체"
+  },
+  {
+    "symbol": "105560",
+    "companyName": "KB금융",
+    "sector": "은행"
+  },
+  {
+    "symbol": "055550",
+    "companyName": "신한지주",
+    "sector": "은행"
+  },
+  {
+    "symbol": "017670",
+    "companyName": "SK텔레콤",
+    "sector": "통신"
+  },
+  {
+    "symbol": "030200",
+    "companyName": "KT",
+    "sector": "통신"
+  }
+]

@@ -1,0 +1,90 @@
+{
+  "batchId": "bt-20260602-003020",
+  "createdAt": "2026-06-02T00:30:24.129295+09:00",
+  "period": {
+    "startDate": "2026-05-01",
+    "endDate": "2026-05-31"
+  },
+  "windowSize": 9,
+  "initialBudgetKrwPerSymbol": 10000000,
+  "portfolioSummary": {
+    "symbolCount": 5,
+    "totalInitialBudgetKrw": 50000000,
+    "totalFinalAssetKrw": 51296500,
+    "totalProfitKrw": 1296500,
+    "totalReturnRatePercent": 2.593,
+    "averageReturnRatePercent": 2.593
+  },
+  "runs": [
+    {
+      "symbol": "005930",
+      "companyName": "삼성전자",
+      "sector": "반도체",
+      "initialBudgetKrw": 10000000,
+      "finalAssetKrw": 10000000,
+      "profitKrw": 0,
+      "returnRatePercent": 0.0,
+      "tradeCount": 0,
+      "buyCount": 0,
+      "sellCount": 0,
+      "finalPositionQuantity": 0,
+      "maxDrawdownPercent": 0.0
+    },
+    {
+      "symbol": "105560",
+      "companyName": "KB금융",
+      "sector": "은행",
+      "initialBudgetKrw": 10000000,
+      "finalAssetKrw": 10509000,
+      "profitKrw": 509000,
+      "returnRatePercent": 5.09,
+      "tradeCount": 3,
+      "buyCount": 2,
+      "sellCount": 1,
+      "finalPositionQuantity": 69,
+      "maxDrawdownPercent": -2.738
+    },
+    {
+      "symbol": "055550",
+      "companyName": "신한지주",
+      "sector": "은행",
+      "initialBudgetKrw": 10000000,
+      "finalAssetKrw": 10030600,
+      "profitKrw": 30600,
+      "returnRatePercent": 0.306,
+      "tradeCount": 2,
+      "buyCount": 1,
+      "sellCount": 1,
+      "finalPositionQuantity": 0,
+      "maxDrawdownPercent": -5.8563
+    },
+    {
+      "symbol": "017670",
+      "companyName": "SK텔레콤",
+      "sector": "통신",
+      "initialBudgetKrw": 10000000,
+      "finalAssetKrw": 11225900,
+      "profitKrw": 1225900,
+      "returnRatePercent": 12.259,
+      "tradeCount": 3,
+      "buyCount": 2,
+      "sellCount": 1,
+      "finalPositionQuantity": 111,
+      "maxDrawdownPercent": -1.976
+    },
+    {
+      "symbol": "030200",
+      "companyName": "KT",
+      "sector": "통신",
+      "initialBudgetKrw": 10000000,
+      "finalAssetKrw": 9531000,
+      "profitKrw": -469000,
+      "returnRatePercent": -4.69,
+      "tradeCount": 3,
+      "buyCount": 2,
+      "sellCount": 1,
+      "finalPositionQuantity": 180,
+      "maxDrawdownPercent": -10.7119
+    }
+  ]
+}
