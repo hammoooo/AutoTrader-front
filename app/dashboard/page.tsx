@@ -36,6 +36,7 @@ export default function Page() {
   return (
     <TooltipProvider>
       <SidebarProvider
+        open={false}
         style={
           {
             "--sidebar-width": "calc(var(--spacing) * 72)",
