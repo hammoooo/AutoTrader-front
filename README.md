@@ -7,6 +7,9 @@
 
 ## 🎬 시연 영상
 
-<video width="100%" autoplay loop muted>
-  <source src="https://github.com/user-attachments/assets/e25e3bc8-31f1-4686-b863-de7c538fd5e1" type="video/mp4">
-</video>
+https://github.com/user-attachments/assets/e25e3bc8-31f1-4686-b863-de7c538fd5e1
+
+<br>
+
+## 시스템 디자인
+<https://github.com/RealAutoTrader/Service>
