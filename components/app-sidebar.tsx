@@ -1,102 +1,37 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
+import Link from "next/link";
 
-import { NavDocuments } from "@/components/nav-documents"
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import { NavMain } from "@/components/nav-main";
+import { NavSecondary } from "@/components/nav-secondary";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 import {
-  LayoutDashboardIcon,
-  ListIcon,
-  ChartBarIcon,
-  FolderIcon,
-  Settings2Icon,
-  CircleHelpIcon,
-  SearchIcon,
-  DatabaseIcon,
-  FileChartColumnIcon,
-  FileIcon,
+  ActivityIcon,
+  BookOpenIcon,
+  FlaskConicalIcon,
   TrendingUpIcon,
-} from "lucide-react"
+} from "lucide-react";
 
-const data = {
-  user: {
-    name: "Trader",
-    email: "trader@autotrader.io",
-    avatar: "/avatars/shadcn.jpg",
+const navDashboards = [
+  {
+    title: "백테스트",
+    url: "/dashboard",
+    icon: <FlaskConicalIcon />,
   },
-  navMain: [
-    {
-      title: "대시보드",
-      url: "#",
-      icon: <LayoutDashboardIcon />,
-    },
-    {
-      title: "매매 로그",
-      url: "#",
-      icon: <ListIcon />,
-    },
-    {
-      title: "종목 분석",
-      url: "#",
-      icon: <ChartBarIcon />,
-    },
-    {
-      title: "포트폴리오",
-      url: "#",
-      icon: <FolderIcon />,
-    },
-    {
-      title: "설정",
-      url: "#",
-      icon: <Settings2Icon />,
-    },
-  ],
-  navSecondary: [
-    {
-      title: "환경 설정",
-      url: "#",
-      icon: <Settings2Icon />,
-    },
-    {
-      title: "도움말",
-      url: "#",
-      icon: <CircleHelpIcon />,
-    },
-    {
-      title: "검색",
-      url: "#",
-      icon: <SearchIcon />,
-    },
-  ],
-  documents: [
-    {
-      name: "데이터 라이브러리",
-      url: "#",
-      icon: <DatabaseIcon />,
-    },
-    {
-      name: "수익률 보고서",
-      url: "#",
-      icon: <FileChartColumnIcon />,
-    },
-    {
-      name: "종목 스크리너",
-      url: "#",
-      icon: <FileIcon />,
-    },
-  ],
-}
+  {
+    title: "실매매",
+    url: "/dashboard/live",
+    icon: <ActivityIcon />,
+  },
+];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -108,22 +43,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
-              <a href="#">
+              <Link href="/dashboard">
                 <TrendingUpIcon className="size-5!" />
                 <span className="text-base font-semibold">AutoTrader</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain label="대시보드" items={navDashboards} />
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={data.user} />
-      </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

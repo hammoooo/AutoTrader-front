@@ -41,6 +41,9 @@ type ChartEntry = {
   zScore: number;
   signal: string;
   executedOrderSide: string;
+  /** 체결 여부와 무관하게 주문이 나간 방향 (실매매). 체결되지 않은 주문은 빈 원으로 표시 */
+  orderSide?: string;
+  orderStatus?: string;
   totalAssetKrw: number;
 };
 
@@ -53,26 +56,47 @@ type Run = {
 type Props = {
   chartDataMap: Record<string, ChartEntry[]>;
   runs: Run[];
+  defaultSymbol?: string;
+  /** 제목에 들어가는 기간 (예: "5월", "10/08 ~ 11/06") */
+  periodLabel?: string;
+  /** 가격 계열 이름 (예: "종가", "평가가") */
+  priceLabel?: string;
+  windowSize?: number;
 };
 
-const chartConfig = {
-  closePrice: {
-    label: "종가",
-    color: "var(--primary)",
-  },
-  rollingMean: {
-    label: "9일 이동평균",
-    color: "var(--chart-2)",
-  },
-  upperBand: {
-    label: "상단밴드 (+2σ)",
-    color: "var(--chart-4)",
-  },
-  lowerBand: {
-    label: "하단밴드 (-2σ)",
-    color: "var(--chart-4)",
-  },
-} satisfies ChartConfig;
+function buildChartConfig(priceLabel: string, windowSize: number) {
+  return {
+    closePrice: {
+      label: priceLabel,
+      color: "var(--primary)",
+    },
+    rollingMean: {
+      label: `${windowSize}일 이동평균`,
+      color: "var(--chart-2)",
+    },
+    upperBand: {
+      label: "상단밴드 (+2σ)",
+      color: "var(--chart-4)",
+    },
+    lowerBand: {
+      label: "하단밴드 (-2σ)",
+      color: "var(--chart-4)",
+    },
+  } satisfies ChartConfig;
+}
+
+function isUnfilledOrder(entry: ChartEntry) {
+  return (
+    !!entry.orderSide &&
+    entry.orderSide !== "NONE" &&
+    entry.executedOrderSide === "NONE"
+  );
+}
+
+const SIDE_COLOR: Record<string, string> = {
+  BUY: "#22c55e",
+  SELL: "#ef4444",
+};
 
 type DotProps = {
   cx?: number;
@@ -107,11 +131,38 @@ function TradeDot({ cx = 0, cy = 0, payload }: DotProps) {
       />
     );
   }
+  if (isUnfilledOrder(payload)) {
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={4.5}
+        fill="var(--background)"
+        stroke={SIDE_COLOR[payload.orderSide ?? ""] ?? "currentColor"}
+        strokeWidth={2}
+      />
+    );
+  }
   return <circle cx={cx} cy={cy} r={0} fill="transparent" />;
 }
 
-export function ChartAreaInteractive({ chartDataMap, runs }: Props) {
-  const [selectedSymbol, setSelectedSymbol] = React.useState("017670");
+export function ChartAreaInteractive({
+  chartDataMap,
+  runs,
+  defaultSymbol = "017670",
+  periodLabel = "5월",
+  priceLabel = "종가",
+  windowSize = 9,
+}: Props) {
+  const [selectedSymbol, setSelectedSymbol] = React.useState(defaultSymbol);
+  const chartConfig = React.useMemo(
+    () => buildChartConfig(priceLabel, windowSize),
+    [priceLabel, windowSize],
+  );
+  const hasUnfilledOrders = React.useMemo(
+    () => Object.values(chartDataMap).some((entries) => entries.some(isUnfilledOrder)),
+    [chartDataMap],
+  );
 
   const data = chartDataMap[selectedSymbol] ?? [];
   const selectedRun = runs.find((r) => r.symbol === selectedSymbol);
@@ -133,8 +184,8 @@ export function ChartAreaInteractive({ chartDataMap, runs }: Props) {
     <Card className="@container/card">
       <CardHeader>
         <CardTitle>
-          {selectedRun?.companyName ?? selectedSymbol} ({selectedSymbol}) — 5월
-          가격 추이
+          {selectedRun?.companyName ?? selectedSymbol} ({selectedSymbol}) —{" "}
+          {periodLabel} 가격 추이
         </CardTitle>
         <CardDescription>
           <span className="hidden @[540px]/card:block">
@@ -223,7 +274,7 @@ export function ChartAreaInteractive({ chartDataMap, runs }: Props) {
                   }
                   formatter={(value, name) => {
                     const labels: Record<string, string> = {
-                      closePrice: "종가",
+                      closePrice: priceLabel,
                       rollingMean: "이동평균",
                       upperBand: "상단밴드",
                       lowerBand: "하단밴드",
@@ -288,12 +339,19 @@ export function ChartAreaInteractive({ chartDataMap, runs }: Props) {
             <span className="inline-block size-2.5 rounded-full bg-red-500" />
             SELL 체결
           </span>
+          {hasUnfilledOrders && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block size-2.5 rounded-full border-2 border-green-500" />
+              <span className="-ml-1 inline-block size-2.5 rounded-full border-2 border-red-500" />
+              미체결 주문
+            </span>
+          )}
           <span className="flex items-center gap-1.5">
             <span
               className="inline-block h-px w-5"
               style={{ borderTop: "1.5px dashed var(--chart-2)" }}
             />
-            9일 이동평균
+            {windowSize}일 이동평균
           </span>
           <span className="flex items-center gap-1.5">
             <span

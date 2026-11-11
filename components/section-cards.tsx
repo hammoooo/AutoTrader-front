@@ -44,13 +44,43 @@ type Props = {
   portfolioSummary: PortfolioSummary;
   runs: Run[];
   period: { startDate: string; endDate: string };
+  windowSize?: number;
+  /** 기간 앞에 붙는 문구 (예: "백테스트 기간", "운용 기간") */
+  periodCaption?: string;
+  tradeCountLabel?: string;
+  /** 체결 여부와 무관한 전체 주문 수 (실매매) */
+  orderCount?: number;
 };
 
 function formatKRW(value: number) {
   return `₩${Math.abs(value).toLocaleString("ko-KR")}`;
 }
 
-export function SectionCards({ portfolioSummary, runs, period }: Props) {
+function signed(value: number) {
+  return `${value > 0 ? "+" : value < 0 ? "-" : ""}${formatKRW(value)}`;
+}
+
+function returnTone(value: number) {
+  if (value > 0) return "text-green-600 border-green-200 dark:border-green-800";
+  if (value < 0) return "text-red-600 border-red-200 dark:border-red-800";
+  return "text-muted-foreground";
+}
+
+function ReturnIcon({ value, className }: { value: number; className?: string }) {
+  if (value > 0) return <TrendingUpIcon className={className} />;
+  if (value < 0) return <TrendingDownIcon className={className} />;
+  return <MinusIcon className={className} />;
+}
+
+export function SectionCards({
+  portfolioSummary,
+  runs,
+  period,
+  windowSize = 9,
+  periodCaption = "백테스트 기간",
+  tradeCountLabel = "총 거래 건수",
+  orderCount,
+}: Props) {
   const sorted = [...runs].sort(
     (a, b) => b.returnRatePercent - a.returnRatePercent,
   );
@@ -99,7 +129,7 @@ export function SectionCards({ portfolioSummary, runs, period }: Props) {
       {/* Card 2: Trade Stats */}
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>총 거래 건수</CardDescription>
+          <CardDescription>{tradeCountLabel}</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {totalTrades}건
           </CardTitle>
@@ -112,10 +142,11 @@ export function SectionCards({ portfolioSummary, runs, period }: Props) {
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            Z-Score 평균회귀 전략 (Window 9)
+            Z-Score 평균회귀 전략 (Window {windowSize})
           </div>
           <div className="text-muted-foreground">
-            백테스트 기간 {periodLabel}
+            {periodCaption} {periodLabel}
+            {orderCount !== undefined && ` · 주문 ${orderCount}건`}
           </div>
         </CardFooter>
       </Card>
@@ -130,16 +161,18 @@ export function SectionCards({ portfolioSummary, runs, period }: Props) {
           <CardAction>
             <Badge
               variant="outline"
-              className="text-green-600 border-green-200 dark:border-green-800"
+              className={returnTone(best.returnRatePercent)}
             >
-              <TrendingUpIcon />+{best.returnRatePercent.toFixed(2)}%
+              <ReturnIcon value={best.returnRatePercent} />
+              {best.returnRatePercent > 0 ? "+" : ""}
+              {best.returnRatePercent.toFixed(2)}%
             </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            수익금 +{formatKRW(best.profitKrw)}{" "}
-            <TrendingUpIcon className="size-4" />
+            수익금 {signed(best.profitKrw)}{" "}
+            <ReturnIcon value={best.profitKrw} className="size-4" />
           </div>
           <div className="text-muted-foreground">
             {best.sector} - {best.tradeCount}건 거래
@@ -160,7 +193,7 @@ export function SectionCards({ portfolioSummary, runs, period }: Props) {
               variant="outline"
               className={
                 worst.returnRatePercent < 0
-                  ? "text-red-600 border-red-200 dark:border-red-800"
+                  ? returnTone(worst.returnRatePercent)
                   : "text-muted-foreground"
               }
             >

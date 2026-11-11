@@ -1,0 +1,34 @@
+[
+  {
+    "tradeDate": "2026-10-12",
+    "orderedAt": "2026-10-12T09:11:20.683953+09:00",
+    "side": "BUY",
+    "quantity": 38,
+    "price": 260000,
+    "orderType": "MARKET",
+    "orderStatus": "SUBMITTED",
+    "brokerAcknowledged": false,
+    "commissionKrw": 0,
+    "sellTaxKrw": 0,
+    "cashKrwAfterExecution": 120000,
+    "positionQuantityAfterExecution": 38,
+    "totalAssetKrwAfterExecution": 10000000,
+    "note": "Z-score 신호 시점 시장가 주문 접수 (체결가는 주문 기준가로 추정)"
+  },
+  {
+    "tradeDate": "2026-11-06",
+    "orderedAt": "2026-11-06T09:11:13.754923+09:00",
+    "side": "BUY",
+    "quantity": 55,
+    "price": 181400,
+    "orderType": "MARKET",
+    "orderStatus": "REJECTED",
+    "brokerAcknowledged": false,
+    "commissionKrw": 0,
+    "sellTaxKrw": 0,
+    "cashKrwAfterExecution": null,
+    "positionQuantityAfterExecution": 38,
+    "totalAssetKrwAfterExecution": null,
+    "note": "KIS가 주문을 거절했습니다: 40910000 - 모의투자 주문이 불가한 계좌입니다."
+  }
+]

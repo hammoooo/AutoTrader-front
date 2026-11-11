@@ -1,0 +1,50 @@
+[
+  {
+    "tradeDate": "2026-10-12",
+    "orderedAt": "2026-10-12T09:11:49.167273+09:00",
+    "side": "BUY",
+    "quantity": 198,
+    "price": 50500,
+    "orderType": "MARKET",
+    "orderStatus": "SUBMITTED",
+    "brokerAcknowledged": false,
+    "commissionKrw": 0,
+    "sellTaxKrw": 0,
+    "cashKrwAfterExecution": 1000,
+    "positionQuantityAfterExecution": 198,
+    "totalAssetKrwAfterExecution": 10000000,
+    "note": "Z-score 신호 시점 시장가 주문 접수 (체결가는 주문 기준가로 추정)"
+  },
+  {
+    "tradeDate": "2026-10-22",
+    "orderedAt": "2026-10-22T09:11:22.546520+09:00",
+    "side": "BUY",
+    "quantity": 210,
+    "price": 47400,
+    "orderType": "MARKET",
+    "orderStatus": "SUBMITTED",
+    "brokerAcknowledged": true,
+    "commissionKrw": 0,
+    "sellTaxKrw": 0,
+    "cashKrwAfterExecution": -9953000,
+    "positionQuantityAfterExecution": 408,
+    "totalAssetKrwAfterExecution": 9386200,
+    "note": "Z-score 신호 시점 시장가 주문 접수 (체결가는 주문 기준가로 추정)"
+  },
+  {
+    "tradeDate": "2026-11-04",
+    "orderedAt": "2026-11-04T09:11:28.981772+09:00",
+    "side": "SELL",
+    "quantity": 210,
+    "price": 48200,
+    "orderType": "MARKET",
+    "orderStatus": "SUBMITTED",
+    "brokerAcknowledged": true,
+    "commissionKrw": 0,
+    "sellTaxKrw": 0,
+    "cashKrwAfterExecution": 169000,
+    "positionQuantityAfterExecution": 198,
+    "totalAssetKrwAfterExecution": 9712600,
+    "note": "Z-score 신호 시점 시장가 주문 접수 (체결가는 주문 기준가로 추정)"
+  }
+]

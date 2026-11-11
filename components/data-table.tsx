@@ -66,6 +66,14 @@ export type Run = {
   sellCount: number
   finalPositionQuantity: number
   maxDrawdownPercent: number
+  // 실매매 전용 (백테스트 데이터에는 없음)
+  orderCount?: number
+  rejectedOrderCount?: number
+  unconfirmedOrderCount?: number
+  finalEvaluationPrice?: number | null
+  lastEvaluatedDate?: string | null
+  /** 운용 중 최저 현금. 음수면 종목 예산을 넘겨 매수한 것 */
+  minCashKrw?: number
 }
 
 export type Trade = {
@@ -75,11 +83,42 @@ export type Trade = {
   price: number
   commissionKrw: number
   sellTaxKrw: number
-  cashKrwAfterExecution: number
-  totalAssetKrwAfterExecution: number
+  /** 체결되지 않은 주문(실매매)은 null */
+  cashKrwAfterExecution: number | null
+  totalAssetKrwAfterExecution: number | null
   note: string
   symbol: string
   companyName: string
+  /** 실매매 주문 상태: SUBMITTED | REJECTED | SUBMISSION_UNKNOWN | NOT_SUBMITTED */
+  orderStatus?: string
+}
+
+type Labels = {
+  resultTitle: string
+  periodLabel: string
+}
+
+const ORDER_STATUS: Record<string, { label: string; className: string }> = {
+  SUBMITTED: {
+    label: "체결",
+    className: "text-blue-600 border-blue-200 dark:border-blue-800",
+  },
+  REJECTED: {
+    label: "거절",
+    className: "text-red-600 border-red-200 dark:border-red-800",
+  },
+  SUBMISSION_UNKNOWN: {
+    label: "미확인",
+    className: "text-amber-600 border-amber-200 dark:border-amber-800",
+  },
+  NOT_SUBMITTED: {
+    label: "미제출",
+    className: "text-muted-foreground",
+  },
+}
+
+function isFilled(trade: Trade) {
+  return trade.totalAssetKrwAfterExecution !== null
 }
 
 function formatKRW(value: number) {
@@ -131,11 +170,11 @@ function SortHeader({
   )
 }
 
-const runColumns: ColumnDef<Run>[] = [
+const buildRunColumns = (labels: Labels): ColumnDef<Run>[] => [
   {
     accessorKey: "companyName",
     header: "종목",
-    cell: ({ row }) => <RunCellViewer run={row.original} />,
+    cell: ({ row }) => <RunCellViewer run={row.original} labels={labels} />,
     enableHiding: false,
   },
   {
@@ -206,7 +245,7 @@ const runColumns: ColumnDef<Run>[] = [
   },
 ]
 
-const tradeColumns: ColumnDef<Trade>[] = [
+const buildTradeColumns = (withStatus: boolean): ColumnDef<Trade>[] => [
   {
     accessorKey: "tradeDate",
     header: "날짜",
@@ -247,6 +286,31 @@ const tradeColumns: ColumnDef<Trade>[] = [
       </Badge>
     ),
   },
+  ...(withStatus
+    ? [
+        {
+          accessorKey: "orderStatus",
+          header: "상태",
+          cell: ({ row }) => {
+            const { orderStatus, note } = row.original
+            // 결과 미확인 주문을 체결로 간주한 경우도 "체결"로 표시
+            const status = isFilled(row.original)
+              ? ORDER_STATUS.SUBMITTED
+              : ORDER_STATUS[orderStatus ?? ""]
+            const label = status?.label ?? orderStatus
+            return (
+              <Badge
+                variant="outline"
+                title={note}
+                className={`text-xs ${status?.className ?? ""}`}
+              >
+                {label}
+              </Badge>
+            )
+          },
+        } satisfies ColumnDef<Trade>,
+      ]
+    : []),
   {
     accessorKey: "quantity",
     header: () => <div className="text-right">수량</div>,
@@ -258,16 +322,24 @@ const tradeColumns: ColumnDef<Trade>[] = [
   },
   {
     accessorKey: "price",
-    header: () => <div className="text-right">체결가</div>,
+    header: () => <div className="text-right">{withStatus ? "주문가" : "체결가"}</div>,
     cell: ({ row }) => (
-      <div className="text-right tabular-nums">{formatKRW(row.original.price)}</div>
+      <div
+        className={`text-right tabular-nums ${isFilled(row.original) ? "" : "text-muted-foreground"}`}
+      >
+        {formatKRW(row.original.price)}
+      </div>
     ),
   },
   {
     id: "amount",
-    header: () => <div className="text-right">체결금액</div>,
+    header: () => (
+      <div className="text-right">{withStatus ? "주문금액" : "체결금액"}</div>
+    ),
     cell: ({ row }) => (
-      <div className="text-right tabular-nums">
+      <div
+        className={`text-right tabular-nums ${isFilled(row.original) ? "" : "text-muted-foreground line-through"}`}
+      >
         {formatKRW(row.original.price * row.original.quantity)}
       </div>
     ),
@@ -275,22 +347,30 @@ const tradeColumns: ColumnDef<Trade>[] = [
   {
     accessorKey: "totalAssetKrwAfterExecution",
     header: () => <div className="text-right">체결 후 자산</div>,
-    cell: ({ row }) => (
-      <div className="text-right tabular-nums">
-        {formatKRW(row.original.totalAssetKrwAfterExecution)}
-      </div>
-    ),
+    cell: ({ row }) => {
+      const asset = row.original.totalAssetKrwAfterExecution
+      return (
+        <div className="text-right tabular-nums">
+          {asset === null ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            formatKRW(asset)
+          )}
+        </div>
+      )
+    },
   },
 ]
 
-function RunTable({ runs }: { runs: Run[] }) {
+function RunTable({ runs, labels }: { runs: Run[]; labels: Labels }) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "returnRatePercent", desc: true },
   ])
+  const columns = React.useMemo(() => buildRunColumns(labels), [labels])
 
   const table = useReactTable({
     data: runs,
-    columns: runColumns,
+    columns,
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -333,10 +413,12 @@ function TradeTable({ trades }: { trades: Trade[] }) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "tradeDate", desc: false },
   ])
+  const withStatus = trades.some((t) => t.orderStatus !== undefined)
+  const columns = React.useMemo(() => buildTradeColumns(withStatus), [withStatus])
 
   const table = useReactTable({
     data: trades,
-    columns: tradeColumns,
+    columns,
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -375,9 +457,29 @@ function TradeTable({ trades }: { trades: Trade[] }) {
   )
 }
 
-export function DataTable({ runs, trades }: { runs: Run[]; trades: Trade[] }) {
-  const buyCount = trades.filter((t) => t.side === "BUY").length
-  const sellCount = trades.filter((t) => t.side === "SELL").length
+export function DataTable({
+  runs,
+  trades,
+  resultTitle = "백테스트 결과",
+  periodLabel = "2026년 5월",
+  tradesFootnote,
+}: {
+  runs: Run[]
+  trades: Trade[]
+  /** 종목 상세 Drawer 제목 접미사 */
+  resultTitle?: string
+  /** 종목 상세 Drawer 부제의 기간 */
+  periodLabel?: string
+  /** 거래 내역 탭 아래 각주 */
+  tradesFootnote?: string
+}) {
+  const filled = trades.filter(isFilled)
+  const buyCount = filled.filter((t) => t.side === "BUY").length
+  const sellCount = filled.filter((t) => t.side === "SELL").length
+  const labels = React.useMemo(
+    () => ({ resultTitle, periodLabel }),
+    [resultTitle, periodLabel],
+  )
 
   return (
     <Tabs defaultValue="performance" className="w-full flex-col justify-start gap-6">
@@ -409,11 +511,14 @@ export function DataTable({ runs, trades }: { runs: Run[]; trades: Trade[] }) {
       </div>
 
       <TabsContent value="performance" className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
-        <RunTable runs={runs} />
+        <RunTable runs={runs} labels={labels} />
       </TabsContent>
 
       <TabsContent value="trades" className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <TradeTable trades={trades} />
+        {tradesFootnote && (
+          <p className="text-xs text-muted-foreground">{tradesFootnote}</p>
+        )}
       </TabsContent>
     </Tabs>
   )
@@ -426,7 +531,7 @@ const drawerChartConfig = {
   },
 } satisfies ChartConfig
 
-function RunCellViewer({ run }: { run: Run }) {
+function RunCellViewer({ run, labels }: { run: Run; labels: Labels }) {
   const isMobile = useIsMobile()
 
   const assetChartData = [
@@ -445,9 +550,9 @@ function RunCellViewer({ run }: { run: Run }) {
       <DrawerContent>
         <DrawerHeader className="gap-1">
           <DrawerTitle>
-            {run.companyName} ({run.symbol}) — 백테스트 결과
+            {run.companyName} ({run.symbol}) — {labels.resultTitle}
           </DrawerTitle>
-          <DrawerDescription>{run.sector} · 2026년 5월</DrawerDescription>
+          <DrawerDescription>{run.sector} · {labels.periodLabel}</DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
           {!isMobile && (
@@ -498,6 +603,36 @@ function RunCellViewer({ run }: { run: Run }) {
                 {run.finalPositionQuantity > 0 ? `${run.finalPositionQuantity}주` : "없음"}
               </span>
             </div>
+            {run.orderCount !== undefined && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">
+                  주문 / 거절{run.unconfirmedOrderCount ? " / 미확인" : ""}
+                </span>
+                <span className="font-medium">
+                  {run.orderCount}건 / {run.rejectedOrderCount ?? 0}건
+                  {run.unconfirmedOrderCount ? ` / ${run.unconfirmedOrderCount}건` : ""}
+                </span>
+              </div>
+            )}
+            {run.minCashKrw !== undefined && run.minCashKrw < 0 && (
+              <div className="col-span-2 flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">예산 초과 매수</span>
+                <span className="font-medium tabular-nums text-amber-600">
+                  최저 현금 -₩{Math.abs(run.minCashKrw).toLocaleString("ko-KR")} (종목 예산 ₩{run.initialBudgetKrw.toLocaleString("ko-KR")} 초과)
+                </span>
+              </div>
+            )}
+            {run.finalEvaluationPrice != null && run.lastEvaluatedDate && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">마지막 평가가</span>
+                <span className="font-medium tabular-nums">
+                  ₩{run.finalEvaluationPrice.toLocaleString("ko-KR")}
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    ({run.lastEvaluatedDate.slice(5).replace("-", "/")})
+                  </span>
+                </span>
+              </div>
+            )}
           </div>
           {!isMobile && run.tradeCount > 0 && (
             <>
@@ -521,7 +656,11 @@ function RunCellViewer({ run }: { run: Run }) {
               <Separator />
               <div className="flex items-center gap-2 text-muted-foreground">
                 <MinusIcon className="size-4" />
-                <span>이 종목은 매매 신호가 발생하지 않아 거래 없이 초기 자금 유지</span>
+                <span>
+                  {run.orderCount
+                    ? `매매 신호로 주문 ${run.orderCount}건이 나갔지만 체결되지 않아 초기 자금 유지`
+                    : "이 종목은 매매 신호가 발생하지 않아 거래 없이 초기 자금 유지"}
+                </span>
               </div>
             </>
           )}
